@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+      <!-- Pyscriptのインポート -->
+  <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css">
+  <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+  <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .center-text {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+    
+  </style>
+</head>
+<body>
+    <h1 class="center-text">Pythonでの実行結果を反映したいけどスキル不足🙇‍♂️</h1>
+
+    <py-script>
+
+    import cv2
+    import numpy as np
+    import micropip await micropip.install("opencv-python") 
+
+
+    class ObjectDetector:
+    def __init__(self, weights_path, config_path, classes_path):
+        self.net = cv2.dnn.readNet(weights_path, config_path)
+        with open(classes_path, 'r') as f:
+            self.classes = [line.strip() for line in f.readlines()]
+
+        layer_names = self.net.getLayerNames()
+        self.output_layers = [layer_names[i - 1] for i in self.net.getUnconnectedOutLayers()]
+
+        np.random.seed(42)
+        self.colors = np.random.uniform(0, 255, size=(len(self.classes), 3))
+
+    def detect_objects(self, frame):
+        height, width, _ = frame.shape
+        blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+        self.net.setInput(blob)
+        outs = self.net.forward(self.output_layers)
+
+        class_ids = []
+        confidences = []
+        boxes = []
+        for out in outs:
+            for detection in out:
+                scores = detection[5:]
+                class_id = np.argmax(scores)
+                confidence = scores[class_id]
+                if confidence > 0.5:
+                    center_x = int(detection[0] * width)
+                    center_y = int(detection[1] * height)
+                    w = int(detection[2] * width)
+                    h = int(detection[3] * height)
+                    x = int(center_x - w / 2)
+                    y = int(center_y - h / 2)
+                    boxes.append([x, y, w, h])
+                    confidences.append(float(confidence))
+                    class_ids.append(class_id)
+
+        indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+        for i in range(len(boxes)):
+            if i in indexes:
+                x, y, w, h = boxes[i]
+                label = str(self.classes[class_ids[i]])
+                color = self.colors[class_ids[i]]
+                confidence = confidences[i]
+                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                text = f"{label}: {confidence:.2f}"
+                cv2.putText(frame, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+        return frame, [(self.classes[class_ids[i]], confidences[i]) for i in range(len(boxes)) if i in indexes]
+
+    def main():
+    WEIGHTS_PATH = 'yolov3.weights'
+    CONFIG_PATH = 'yolov3.cfg'
+    CLASSES_PATH = 'coco.names'
+    cap = cv2.VideoCapture(0)
+    detector = ObjectDetector(WEIGHTS_PATH, CONFIG_PATH, CLASSES_PATH)
+    paused = False
+
+    while True:
+        if not paused:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame_with_detection, detected_objects = detector.detect_objects(frame)
+            cv2.imshow('Real-time Object Detection', frame_with_detection)
+
+            if detected_objects:
+                print("検出されたオブジェクト:")
+                for obj, conf in detected_objects:
+                    print(f"- {obj} (信頼度: {conf:.2f})")
+
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):  # 終了
+            break
+        elif key == ord('p'):  # 一時停止
+            paused = True
+        elif key == ord('r'):  # 再開
+            paused = False
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+    def download_yolo_files():
+    print("YOLOv3ファイルのダウンロードを開始します...")
+    print("重みファイルをダウンロード中...")
+    import urllib.request
+    urllib.request.urlretrieve(
+        "https://pjreddie.com/media/files/yolov3.weights", 
+        "yolov3.weights"
+    )
+    print("設定ファイルをダウンロード中...")
+    urllib.request.urlretrieve(
+        "https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3.cfg", 
+        "yolov3.cfg"
+    )
+    print("クラスファイルをダウンロード中...")
+    urllib.request.urlretrieve(
+        "https://raw.githubusercontent.com/pjreddie/darknet/master/data/coco.names", 
+        "coco.names"
+    )
+    print("ダウンロード完了!")
+
+    if __name__ == "__main__":
+    download_yolo_files()
+    main()
+
+
+
+
+
+
+
+
+    </py-script>
+
+
+</body>
+
+
+
+
+</html>
